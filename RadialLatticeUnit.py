@@ -64,13 +64,17 @@ class subCell:
         crvs = rs.JoinCurves(crvs,True)
         return crvs
 
-def grid(x,y,z,nX,nY,nZ,attPts,thres):
+def grid(theta,phi,rho,nTheta,nPhi,nR,attPts):
     newObjs = []
     pts = []
-    for i in range(nX):
-        for j in range(nY):
-            for k in range(nZ):
-                pts.append([x*i,y*j,z*k])
+    for i in range(nTheta):
+        for j in range(nPhi):
+            for k in range(nR):
+                r = k+1
+                X = rho*r*m.cos(m.pi/180*phi*j)*m.cos(m.pi/180*theta*i)
+                Y = rho*r*m.cos(m.pi/180*phi*j)*m.sin(m.pi/180*theta*i)
+                Z = rho*r*m.sin(m.pi/180*phi*j)
+                pts.append([X,Y,Z])
     return pts
 
 def warp(pts,attPts,thres,maxRatio):
@@ -94,22 +98,19 @@ def warp(pts,attPts,thres,maxRatio):
     return pts
 
 def Main():
-    objs = rs.GetObjects("select objects")
     attPts = rs.GetObjects("select attPts",rs.filter.point)
-    box = rs.BoundingBox(objs)
-    dim = 6
-    nX = rs.GetInteger("please enter number in x" ,14)
-    nY = rs.GetInteger("please enter number in y",3)
-    nZ = rs.GetInteger("please enter number in z",6)
-    X = rs.GetReal("please enter x axis spacing",rs.Distance(box[1],box[0]))
-    Y = rs.GetReal("please enter y axis spacing",rs.Distance(box[0],box[3]))
-    Z = rs.GetReal("please enter z axis spacing",rs.Distance(box[0],box[4]))
-    thres = rs.GetReal("please enter attractor strength",(X+Y+Z)/3*4)
+    theta = rs.GetReal("please enter xy ang spacing",20)
+    phi = rs.GetReal("please enter yz ang spacing",20)
+    rho = rs.GetReal("please enter shell spacing",10)
+    thres = rs.GetReal("please enter attractor strength",rho*4)
+    nTheta = rs.GetInteger("please enter angle of XY plane",360/theta)
+    nPhi = rs.GetInteger("please enter angle of YZ plane",360/phi)
+    nR = rs.GetInteger("please enter number of shells",10)
     maxRatio = rs.GetReal("please enter maximum ratio",.5)
-    gridPts = grid(X,Y,Z,nX,nY,nZ,attPts,40)
-    for i in range(len(gridPts)-dim*dim-1):
-        cellPts = [gridPts[i],gridPts[i+nZ],gridPts[i+nZ*nY+nZ],gridPts[i+nZ*nY]] 
-        cellPts.extend([gridPts[i+1],gridPts[i+nZ+1],gridPts[i+nZ*nY+nZ+1],gridPts[i+nZ*nY+1]])
+    gridPts = grid(theta,phi,rho,nTheta,nPhi,nR,attPts)
+    for i in range(len(gridPts)-nPhi*nR-1):
+        cellPts = [gridPts[i],gridPts[i+nR],gridPts[i+nR*nPhi+nR],gridPts[i+nR*nPhi]] 
+        cellPts.extend([gridPts[i+1],gridPts[i+nR+1],gridPts[i+nR*nPhi+nR+1],gridPts[i+nR*nPhi+1]])
         max = 0
         sum = [0,0,0]
         for j in range(len(cellPts)):
@@ -120,7 +121,7 @@ def Main():
                     max=dist
         cnt = sum/len(cellPts)
         sum = [0,0,0]
-        if max<X+Y+Z:
+        if max<rho*2:
             myCell = cell(cellPts,[.5,0,.5])
             members = myCell.genCell(attPts,thres,maxRatio)
             #for j in range(len(members)):
