@@ -3,43 +3,74 @@ import random as r
 import math as m
 
 class tile:
-    def __init__(self,VERTICIES):
+    def __init__(self,VERTICIES,THICKNESS,HEIGHT,BASEHEIGHT):
         self.vert = VERTICIES
+        self.thickness = THICKNESS
         self.x = rs.VectorCreate(self.vert[1],self.vert[0])
         self.y = rs.VectorCreate(self.vert[3],self.vert[0])
+        self.z = [0,0,HEIGHT]
+        self.base = [0,0,BASEHEIGHT]
     def gen(self):
         pts = []
-        pts.extend(self.vert)
-        pts.append(self.vert[0])
-        profile = rs.AddCurve(pts,1)
+        newPts = []
+        faces = []
+        for i in range(len(self.vert)):
+            pts.append(rs.PointAdd(self.vert[i],self.base))
+        pts.append(rs.PointAdd(self.vert[0],self.base))
+        cnt = self.cntPt()
+        for i in range(len(self.vert)):
+            vec = rs.VectorUnitize(rs.VectorCreate(cnt,self.vert[i]))
+            vec = vec*self.thickness
+            vec = rs.VectorAdd(vec,self.z)
+            newPts.append(rs.PointAdd(self.vert[i],vec))
+        newPts.append(newPts[0])
+        pts.extend(newPts)
+        for i in range(len(self.vert)):
+            if i<len(self.vert)-1:
+                faces.append([i,i+5,i+6,i+1])
+            else:
+                faces.append([i,i+5,5,0])
+        faces.append([0,1,2,3])
+        faces.append([5,6,7,8])
+        profile = rs.AddMesh(pts,faces)
         return profile
     def subDiv(self):
-        profile = self.gen()
+        rs.CurrentLayer("structured")
         divTiles = []
+        cnt = self.cntPt()
         startPtX = rs.PointAdd(self.vert[0],self.x/2)
         startPtY = rs.PointAdd(self.vert[0],self.y/2)
         endPtX = rs.PointAdd(self.vert[2],-self.x/2)
         endPtY = rs.PointAdd(self.vert[2],-self.y/2)
-        cnt = self.cntPt()
-        divTiles.append(tile([self.vert[0],startPtX,cnt,startPtY]))
-        divTiles.append(tile([startPtX,self.vert[1],endPtY,cnt]))
-        divTiles.append(tile([cnt,endPtY,self.vert[2],endPtX]))
-        divTiles.append(tile([startPtY,cnt,endPtX,self.vert[3]]))
+        pts = [startPtX,startPtY,endPtX,endPtY]
+        pts.extend(self.vert)
+        for i in range(len(pts)):
+            vec = rs.VectorUnitize(rs.VectorCreate(cnt,pts[i]))
+            pts[i] = rs.PointAdd(pts[i],self.thickness*vec)
+        divTiles.append(tile([pts[4],pts[0],cnt,pts[1]],self.thickness,self.z[2]*1.5,self.z[2]))
+        divTiles.append(tile([pts[0],pts[5],pts[3],cnt],self.thickness,self.z[2]*1.5,self.z[2]))
+        divTiles.append(tile([cnt,pts[3],pts[6],pts[2]],self.thickness,self.z[2]*1.5,self.z[2]))
+        divTiles.append(tile([pts[1],cnt,pts[2],pts[7]],self.thickness,self.z[2]*1.5,self.z[2]))
         for i in range(len(divTiles)):
             divTiles[i].gen()
         return divTiles
     def perforate(self,factor):
-        profile = self.gen()
-        if factor>0:
+        rs.CurrentLayer("structured")
+        cnt = self.cntPt()
+        vec = rs.VectorCreate(cnt,self.vert[0])
+        if factor*vec>self.thickness:
             newPts = []
             cnt = self.cntPt()
             if factor<1:
                 for i in range(len(self.vert)):
                     vec = rs.VectorCreate(cnt,self.vert[i])
                     newPts.append(rs.PointAdd(self.vert[i],factor*vec))
-            perforatedCell = tile(newPts)
+            perforatedCell = tile(newPts,0)
+            rs.CurrentLayer("windows")
             return perforatedCell.gen()
         else:
+            rs.CurrentLayer("structured")
+            profile = self.gen()
             return profile
     def cntPt(self):
         sum = [0,0,0]
@@ -81,6 +112,8 @@ def createTiles(sets,cuts,attPts,perfPts,strength):
     pts = []
     myTiles = []
     profiles = []
+    thick = .02
+    height = .05
     for i in range(len(sets)):
         pts.append(collectIntersections(sets[i],cuts))
     for i in range(len(pts)-1):
@@ -89,37 +122,46 @@ def createTiles(sets,cuts,attPts,perfPts,strength):
         else:
             min = len(pts[i+1])
         for j in range(min-1):
-            myTiles.append(tile([pts[i][j],pts[i+1][j],pts[i+1][j+1],pts[i][j+1]]))
+            myTiles.append(tile([pts[i][j],pts[i+1][j],pts[i+1][j+1],pts[i][j+1]],thick,height,0))
     for i in range(len(myTiles)):
         cntPt = myTiles[i].cntPt()
-        sum = 0
-        sumP = 0
+        smallTiles = []
+        smallerTiles = []
+        smallPerf = []
+        sum,num = 0,0
+        sumP,numP = 0,0
         for j in range(len(attPts)):
-            sum = sum + rs.Distance(cntPt,attPts[j])
+            if rs.Distance(cntPt,attPts[j])<strength:
+                sum = sum + rs.Distance(cntPt,attPts[j])
+                num = num + 1
         for j in range(len(perfPts)):
-            sumP = sumP + rs.Distance(cntPt,perfPts[j])
-        valSub = sum/len(attPts)/strength
-        valPerf = sumP/len(perfPts)/strength
-        if valPerf>.8:
-            valPerf = 0
-        factor = r.random()
-        if valSub<factor: 
-            smallTiles = myTiles[i].subDiv()
-            if valSub<factor/2:
-                for k in range(len(smallTiles)):
-                    smallerTiles = smallTiles[k].subDiv()
-                if valSub<factor/3:
-                    for n in range(len(smallerTiles)):
-                        smallestTiles = smallerTiles[n].subDiv()
-                        #smallestTiles[n].perforate(valPerf)
-                else:
-                    for k in range(len(smallerTiles)):
-                        smallerTiles[k].perforate(valPerf)
-            else:
-                for k in range(len(smallTiles)):
-                    smallTiles[k].perforate(valPerf)
+            if rs.Distance(cntPt,perfPts[j])<strength:
+                sumP = sumP + rs.Distance(cntPt,perfPts[j])
+                numP = numP + 1
+        if num!=0:
+            valSub = sum/(num*strength)
         else:
-            profiles.append(myTiles[i].perforate(valPerf))
+            valSub = 5
+        if numP!=0:
+            valPerf = sumP/(numP*strength)
+        else:
+            valPerf = 0
+        factorSub = r.random()
+        if valSub<factorSub: 
+            smallTiles.extend(myTiles[i].subDiv())
+            if valSub<factorSub/2:
+                for k in range(len(smallTiles)):
+                    smallerTiles.extend(smallTiles[k].subDiv())
+                if valSub<factorSub/3:
+                    for n in range(len(smallerTiles)):
+                        smallerTiles[n].thickness = thick*2
+                        smallerTiles[n].subDiv()
+                        #smallestTiles[n].perforate(valPerf)
+        factorPerf = r.random()
+        if valPerf<factorPerf and valSub>factorSub:
+            myTiles[i].perforate(valPerf)
+        else:
+            profiles.append(myTiles[i].gen())
     return profiles
 
 def Main():
@@ -127,7 +169,9 @@ def Main():
     refPt = rs.GetObject("please select reference pt",rs.filter.point)
     attPts = rs.GetObjects("please select attPts",rs.filter.point)
     perfPts = rs.GetObjects("please select perforationPts",rs.filter.point)
-    strength = rs.GetReal("please enter attPt range",300)
+    strength = rs.GetReal("please enter attPt range",5)
+    rs.AddLayer("windows",[0,0,255])
+    rs.AddLayer("structured",[0,255,0])
     crvX = []
     crvY = []
     vecX = rs.VectorCreate(rs.CurveEndPoint(crvs[0]),rs.CurveStartPoint(crvs[0]))
@@ -140,7 +184,7 @@ def Main():
     crvX = SortCurvesByPt(crvX,refPt)
     crvY = SortCurvesByPt(crvY,refPt)
     createTiles(crvX,crvY,attPts,perfPts,strength)
-    rs.DeleteObjects(crvX)
-    rs.DeleteObjects(crvY)
+    #rs.DeleteObjects(crvX)
+    #rs.DeleteObjects(crvY)
 
 Main()
