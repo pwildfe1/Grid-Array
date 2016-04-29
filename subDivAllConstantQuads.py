@@ -88,7 +88,7 @@ class tile:
         mid = int(self.div/2)
         end = int(self.div)
         divTiles.append(tile([pts[0][0],pts[mid][0],pts[mid][mid],pts[0][mid]],self.thick,height,int(self.div)))
-        divTiles.append(tile([pts[0][mid],pts[0][end],pts[mid][end],pts[mid][mid]],self.thick,height,int(self.div)))
+        divTiles.append(tile([pts[0][mid],pts[mid][mid],pts[mid][end],pts[0][end]],self.thick,height,int(self.div)))
         divTiles.append(tile([pts[mid][mid],pts[end][mid],pts[end][end],pts[mid][end]],self.thick,height,int(self.div)))
         divTiles.append(tile([pts[mid][0],pts[end][0],pts[end][mid],pts[mid][mid]],self.thick,height,int(self.div)))
         for i in range(int(self.div)+1):
@@ -144,13 +144,12 @@ def collectIntersections(set,cuts):
             intersectPts.append(intersect[0][1])
     return intersectPts
 
-def createTiles(sets,cuts,structPts,perfPts,container,strength):
+def createTiles(sets,cuts,structPts,perfPts,container,strength,height):
     pts = []
     myTiles = []
     profiles = []
     minThick = .1
     maxThick = .8
-    height = .05
     division = 4
     structAtt = attractors(structPts,strength,False)
     perfAtt = attractors(perfPts,strength,False)
@@ -199,6 +198,7 @@ def Main():
     perfPts = rs.GetObjects("please select perforationPts",rs.filter.point)
     container = rs.GetObjects("please select containers",rs.filter.polysurface)
     strength = rs.GetReal("please enter attPt range",5)
+    height = rs.GetReal("please enter height",.05)
     rs.AddLayer("windows",[0,0,255])
     rs.AddLayer("structured",[0,255,0])
     crvX = []
@@ -208,11 +208,11 @@ def Main():
         vec = rs.VectorCreate(rs.CurveEndPoint(crvs[i]),rs.CurveStartPoint(crvs[i]))
         if rs.VectorAngle(vec,vecX)<1:
             crvX.append(crvs[i])
-        else:1
+        else:
             crvY.append(crvs[i])
     crvX = SortCurvesByPt(crvX,refPt)
     crvY = SortCurvesByPt(crvY,refPt)
-    createTiles(crvX,crvY,structPts,perfPts,container,strength)
+    createTiles(crvX,crvY,structPts,perfPts,container,strength,height)
     #rs.DeleteObjects(crvX)
     #rs.DeleteObjects(crvY)
 
