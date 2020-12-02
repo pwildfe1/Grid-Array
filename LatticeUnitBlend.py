@@ -3,8 +3,9 @@ import math as m
 
 
 class cell:
-    def __init__(self,VERTICIES,RATIOS):
+    def __init__(self,VERTICIES,RATIOS,GOALS):
         self.ratio = RATIOS
+        self.goal = GOALS
         self.vert = VERTICIES
         self.x = rs.VectorCreate(self.vert[0],self.vert[1])
         self.y = rs.VectorCreate(self.vert[0],self.vert[3])
@@ -15,7 +16,7 @@ class cell:
             vec = rs.VectorCreate(self.vert[origin],self.vert[indexes[i]])/2
             subPt = rs.PointAdd(self.vert[indexes[i]],vec)
             subPts.append(subPt)
-        piece = subCell(self.vert[origin],subPts,self.ratio)
+        piece = subCell(self.vert[origin],subPts,self.ratio,self.goal)
         return piece
     def genCell(self,attPts,thres,maxRatio):
         mySubCells = []
@@ -34,13 +35,21 @@ class cell:
         return members
 
 class subCell:
-    def __init__(self,ORIGIN,PTS,RATIOS):
+    def __init__(self,ORIGIN,PTS,RATIOS,GOAL):
         self.origin = ORIGIN
         self.vert = PTS
         self.ratio = RATIOS
+        self.goal = GOAL
+        self.vectorSet = []
+        for i in range(len(self.goal)):
+            self.vectorSet.append(self.goal-self.ratio)
         self.axes = []
         for i in range(len(self.vert)):
             self.axes.append(rs.VectorCreate(self.vert[i],self.origin))
+    def adjust(self,attPts):
+        for i in range(len(self.vert)):
+            sum = [0,0,0]
+            num = 0
     def gen(self):
         members = []
         for i in range(len(self.vert)):
@@ -132,7 +141,7 @@ def Main():
             if keep==True:
                 members = myCell.genCell(attPts,thres,maxRatio)
             """
-            myCell = cell(cellPts,[.5,0,.5])
+            myCell = cell(cellPts,[.5,0,.5],[.2,.2,.2])
             members = myCell.genCell(attPts,thres,maxRatio)
             #for j in range(len(members)):
             #    members[j] = rs.ScaleObjects(members[j],cnt,[1.25,1.25,1.25])
